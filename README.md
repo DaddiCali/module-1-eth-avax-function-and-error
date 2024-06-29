@@ -21,7 +21,8 @@ pragma solidity ^0.8.0;
 contract MonthlyAllowanceTracker {
     address public owner;
     uint256 public monthlyAllowance;
-    
+    uint256 public monthlyCycleStart;
+
     event AllowanceUpdated(uint256 newAllowance);
     event AllowanceAdded(uint256 addedValue);
     event DailyExpenses(uint256 spentValue);
@@ -29,6 +30,7 @@ contract MonthlyAllowanceTracker {
     constructor() {
         owner = msg.sender;
         monthlyAllowance = 0; // Initialize with zero allowance
+        monthlyCycleStart = block.timestamp;
     }
 
     modifier onlyOwner() {
@@ -36,32 +38,52 @@ contract MonthlyAllowanceTracker {
         _;
     }
 
-    function addAllowance(uint256 _value) public payable {
+    modifier checkMonthlyCycle() {
+        if (block.timestamp >= monthlyCycleStart + 30 days) {
+            monthlyAllowance = 0; // Reset allowance at the start of a new cycle
+            monthlyCycleStart = block.timestamp;
+        }
+        _;
+    }
+
+    function addAllowance(uint256 _value) public payable onlyOwner checkMonthlyCycle {
         require(_value > 0, "Add Allowance value should be greater than 0");
         require(_value <= 500 ether, "Add Allowance value should be 500 Ether or less");
         monthlyAllowance += _value;
         emit AllowanceAdded(_value);
     }
 
-    function spendDailyAllowance(uint256 _value) public {
+    function spendDailyAllowance(uint256 _value) public checkMonthlyCycle {
         require(_value > 0, "Daily Expenses value should be greater than 0");
         require(_value <= monthlyAllowance, "Insufficient monthly allowance");
         monthlyAllowance -= _value;
         emit DailyExpenses(_value);
+
+        // Using assert to ensure state variable integrity
+        assert(monthlyAllowance >= 0);
     }
 
     function updateMonthlyAllowance(uint256 newAllowance) public onlyOwner {
         monthlyAllowance = newAllowance;
         emit AllowanceUpdated(newAllowance);
+
+        // Using assert to ensure state variable integrity
+        assert(monthlyAllowance == newAllowance);
     }
 
     function getMonthlyAllowance() public view returns (uint256) {
         return monthlyAllowance;
     }
 
+    function forceRevert() public pure {
+        // Using revert to demonstrate its functionality
+        revert("This is a forced revert statement");
+    }
+
     // Fallback function to receive Ether
     receive() external payable {}
 }
+
 
 Owner
 The owner of the contract is set during deployment and has exclusive access to the updateMonthlyAllowance function.
